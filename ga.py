@@ -1,9 +1,18 @@
 import os
 import numpy as np
-from fitness import fitness, evaluate_baseline, DEFAULT_TAU, PENALTY_WEIGHT
- 
+# from fitness import fitness, evaluate_baseline, DEFAULT_TAU, PENALTY_WEIGHT
+from fitness import (
+    fitness,
+    evaluate_baseline,
+    find_problematic_pairs,
+    DEFAULT_TAU,
+    PENALTY_WEIGHT,
+)
+
+
+
 POP_SIZE        = 100      
-N_GENERATIONS   = 100     
+N_GENERATIONS   = 200     
 ELITE_FRACTION  = 0.10    
 MUTATION_RATE   = 0.25    
 MUTATION_SIGMA  = 3.0                     
@@ -13,18 +22,74 @@ LAB_MIN = np.array([  0.0, -128.0, -128.0])
 LAB_MAX = np.array([100.0,  127.0,  127.0])
 
 
-def init_population(original_lab, pop_size=POP_SIZE, sigma=MUTATION_SIGMA):
-    
-    k = len(original_lab)
+
+
+def get_mutable_indices(original_lab,
+                        threshold,
+                        cvd_types=("protan", "deutan", "tritan")):
+
+    remaining_pairs = set(
+        find_problematic_pairs(
+            original_lab,
+            threshold=threshold,
+            cvd_types=cvd_types,
+        )
+    )
+
+    mutable = set()
+
+    while remaining_pairs:
+
+        # Count how many remaining conflicts each colour participates in
+        counts = {}
+
+        for i, j in remaining_pairs:
+            counts[i] = counts.get(i, 0) + 1
+            counts[j] = counts.get(j, 0) + 1
+
+        # Pick the colour involved in the most conflicts
+        chosen = max(counts, key=counts.get)
+
+        mutable.add(chosen)
+
+        # Remove every conflict solved by moving this colour
+        remaining_pairs = {
+            pair
+            for pair in remaining_pairs
+            if chosen not in pair
+        }
+
+    return sorted(mutable)
+
+
+def init_population(original_lab,
+                    mutable_indices,
+                    pop_size=POP_SIZE,
+                    sigma=MUTATION_SIGMA):
+
     population = []
- 
+
     population.append(original_lab.copy())
- 
+
     for _ in range(pop_size - 1):
-        noise = np.random.normal(0, sigma, size=(k, 3))
-        candidate = np.clip(original_lab + noise, LAB_MIN, LAB_MAX)
+
+        candidate = original_lab.copy()
+
+        noise = np.random.normal(
+            0,
+            sigma,
+            size=(len(mutable_indices), 3)
+        )
+
+        for idx, colour_idx in enumerate(mutable_indices):
+            candidate[colour_idx] = np.clip(
+                candidate[colour_idx] + noise[idx],
+                LAB_MIN,
+                LAB_MAX,
+            )
+
         population.append(candidate)
- 
+
     return population
 
 def tournament_select(population, scores, tournament_size=TOURNAMENT_SIZE):
@@ -34,20 +99,28 @@ def tournament_select(population, scores, tournament_size=TOURNAMENT_SIZE):
     return population[best_idx].copy()
  
  
-def crossover(parent_a, parent_b):
+def crossover(parent_a,
+              parent_b,
+              mutable_indices):
 
-    k = len(parent_a)
-    mask = np.random.rand(k) < 0.5          # True = take from parent_a
-    child = np.where(mask[:, None], parent_a, parent_b)
+    child = parent_a.copy()
+
+    for idx in mutable_indices:
+
+        if np.random.rand() < 0.5:
+            child[idx] = parent_b[idx]
+
     return child
- 
-def mutate(individual, original_lab, mutation_rate=MUTATION_RATE,
+
+
+def mutate(individual, original_lab,
+           mutable_indices, mutation_rate=MUTATION_RATE,
            sigma=MUTATION_SIGMA, tau=DEFAULT_TAU):
 
     mutated = individual.copy()
     k = len(mutated)
  
-    for i in range(k):
+    for i in mutable_indices:
         if np.random.rand() < mutation_rate:
             noise = np.random.normal(0, sigma, size=3)
             new_colour = np.clip(mutated[i] + noise, LAB_MIN, LAB_MAX)
@@ -66,6 +139,7 @@ def mutate(individual, original_lab, mutation_rate=MUTATION_RATE,
     return mutated
  
 def run_ga(original_lab,
+           mutable_indices,
            cvd_types=None,
            pop_size=POP_SIZE,
            n_generations=N_GENERATIONS,
@@ -95,11 +169,16 @@ def run_ga(original_lab,
         print(f"  Fidelity τ   : {tau} ΔE units")
         print("=" * 55 + "\n")
         evaluate_baseline(original_lab, cvd_types=cvd_types)
+        
         print()
  
     # ── Step 1: Initialise population ──
-    population = init_population(original_lab, pop_size=pop_size,
-                                  sigma=mutation_sigma)
+    population = init_population(
+        original_lab,
+        mutable_indices,
+        pop_size=pop_size,
+        sigma=mutation_sigma,
+    )
  
     # ── Snapshot setup ──
     if snapshot_dir is not None:
@@ -161,11 +240,15 @@ def run_ga(original_lab,
             parent_a = tournament_select(population, scores)
             parent_b = tournament_select(population, scores)
  
-            child = crossover(parent_a, parent_b)
-            child = mutate(child, original_lab,
-                           mutation_rate=mutation_rate,
-                           sigma=mutation_sigma,
-                           tau=tau)
+            child = crossover( parent_a, parent_b, mutable_indices,)
+            child = mutate(
+                child,
+                original_lab,
+                mutable_indices,
+                mutation_rate=mutation_rate,
+                sigma=mutation_sigma,
+                tau=tau,
+            )
             next_gen.append(child)
  
         population = next_gen

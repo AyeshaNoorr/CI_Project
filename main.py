@@ -93,8 +93,19 @@ import numpy as np
  
 from cvd_module import srgb_to_lab, lab_to_srgb
 from palette_extraction import extract_palette_from_path, print_palette
-from ga import run_ga, report_result, POP_SIZE, N_GENERATIONS
-from fitness import fitness, DEFAULT_TAU
+from ga import (
+    run_ga,
+    report_result,
+    get_mutable_indices,
+    POP_SIZE,
+    N_GENERATIONS,
+)
+from fitness import (
+    fitness,
+    DEFAULT_TAU,
+    print_conflict_report,
+    print_colour_summary,
+)
 from visualize import show_palette_comparison, show_convergence
  
  
@@ -119,30 +130,54 @@ TEST_PALETTE_RGB = np.array([
     [1.0, 0.8196, 0.0],   # dark red
     [0.15, 0.50, 0.15],   # dark green
 ])  
+
+
+
+TEST_PALETTE_RGB = np.array([
+    [0.95, 0.10, 0.10],   # bright red
+    [0.75, 0.20, 0.20],   # dark red
+    [0.10, 0.85, 0.10],   # bright green
+    [0.20, 0.60, 0.20],   # dark green
+    [0.10, 0.20, 0.95],   # blue
+    [0.95, 0.90, 0.15],   # yellow
+])
  
 def main():
     # ── Parse arguments ──────────────────────────────────────
     parser = argparse.ArgumentParser(
         description="Optimise a colour palette for colour blindness accessibility"
     )
-    parser.add_argument("--image",   type=str,   default=None,
+
+    parser.add_argument("--image", type=str, default=None,
                         help="Path to input image")
-    parser.add_argument("--colours", type=int,   default=6,
+
+    parser.add_argument("--colours", type=int, default=6,
                         help="Number of palette colours (default: 6)")
-    parser.add_argument("--cvd",     type=str,   nargs="+",
+
+    parser.add_argument("--cvd", type=str, nargs="+",
                         default=["protan", "deutan", "tritan"],
                         choices=["deutan", "protan", "tritan"],
                         help="CVD types to optimise for (default: all three)")
-    parser.add_argument("--gens",    type=int,   default=N_GENERATIONS,
+
+    parser.add_argument("--gens", type=int, default=N_GENERATIONS,
                         help=f"GA generations (default: {N_GENERATIONS})")
-    parser.add_argument("--pop",     type=int,   default=POP_SIZE,
+
+    parser.add_argument("--pop", type=int, default=POP_SIZE,
                         help=f"GA population size (default: {POP_SIZE})")
-    parser.add_argument("--tau",     type=float, default=DEFAULT_TAU,
-                        help=f"Fidelity threshold in ΔE units (default: {DEFAULT_TAU})")
-    parser.add_argument("--runs",    type=int,   default=1,
+
+    parser.add_argument("--tau", type=float, default=DEFAULT_TAU,
+                        help=f"Maximum allowed colour drift ΔE (default: {DEFAULT_TAU})")
+
+    # NEW: Threshold for detecting problematic colour pairs
+    parser.add_argument("--deltae", type=float, default=15,
+                        help="ΔE threshold below which two colours are considered conflicting")
+
+    parser.add_argument("--runs", type=int, default=1,
                         help="Number of independent GA runs (default: 1)")
-    parser.add_argument("--save",    action="store_true",
+
+    parser.add_argument("--save", action="store_true",
                         help="Save figures to disk instead of displaying")
+
     args = parser.parse_args()
  
     print("\n" + "=" * 55)
@@ -167,7 +202,44 @@ def main():
             hex_col = "#{:02x}{:02x}{:02x}".format(
                 int(rgb[0]*255), int(rgb[1]*255), int(rgb[2]*255))
             print(f"    [{i}] {hex_col}  LAB=({lab[0]:.1f}, {lab[1]:.1f}, {lab[2]:.1f})")
- 
+
+    # ----------------------------------------------------------
+    # Determine which colours actually require optimisation
+    # ----------------------------------------------------------
+    print_conflict_report(
+        palette_lab,
+        threshold=args.deltae,
+        cvd_types=args.cvd,
+    )
+
+    mutable_indices = get_mutable_indices(
+        palette_lab,
+        threshold=args.deltae,
+        cvd_types=args.cvd,
+    )
+
+
+    print_colour_summary(
+        palette_lab,
+        threshold=args.deltae,
+        cvd_types=args.cvd,
+        mutable_indices=mutable_indices,
+    )
+
+    print("\nColours selected for optimisation:")
+    print(f"  {mutable_indices}")
+
+    frozen_indices = [
+        i for i in range(len(palette_lab))
+        if i not in mutable_indices
+    ]
+
+    print("Colours kept unchanged:")
+    print(f"  {frozen_indices}")
+    print()
+
+
+
     # ── Step 2: Run the GA ────────────────────────────────────
     print(f"\n  Optimising for: {', '.join(c.upper() for c in args.cvd)}")
     print(f"  τ = {args.tau} ΔE  |  {args.gens} generations  |  population {args.pop}")
@@ -201,6 +273,7 @@ def main():
  
         optimized_lab, history = run_ga(
             palette_lab,
+            mutable_indices=mutable_indices,
             cvd_types=args.cvd,
             pop_size=args.pop,
             n_generations=args.gens,

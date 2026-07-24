@@ -102,15 +102,23 @@ from visualize import show_palette_comparison, show_convergence
 # Built-in test palette (used when no image is provided)
 # A deliberately bad palette: all red-green confusion colours
 # ─────────────────────────────────────────────────────────────
+# TEST_PALETTE_RGB = np.array([
+#     [0.55, 0.407, 0.121],   # red
+#     [0.9170, 0.96, 0.67],   # green
+#     [0.72940, 0.8117, 0.9333],   # orange
+#     [0.8588, 0.3921, 0.8392],   # lime green
+#     [0.2156, 0.91764, 0.803],   # dark red
+#     [0.15, 0.50, 0.15],   # dark green
+# ])
+
 TEST_PALETTE_RGB = np.array([
-    [0.85, 0.10, 0.10],   # red
-    [0.10, 0.75, 0.10],   # green
-    [0.80, 0.45, 0.05],   # orange
-    [0.25, 0.60, 0.20],   # lime green
-    [0.65, 0.20, 0.05],   # dark red
+    [0.0, 0.6392, 0.8784],   # red
+    [0.0, 0.6588, 0.5608],   # green
+    [0.5412, 0.2471, 0.9882],   # orange
+    [0.902, 0.0, 0.4039],   # lime green
+    [1.0, 0.8196, 0.0],   # dark red
     [0.15, 0.50, 0.15],   # dark green
-])
- 
+])  
  
 def main():
     # ── Parse arguments ──────────────────────────────────────

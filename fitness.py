@@ -87,7 +87,7 @@ def fidelity_violations(original_lab, candidate_lab, tau=DEFAULT_TAU):
 # Detect problematic colour pairs
 # ---------------------------------------------------------------------------
 def find_problematic_pairs(original_lab,
-                           threshold=15,
+                           threshold=10,
                            cvd_types=None,
                            return_details=False):
     """
@@ -130,11 +130,18 @@ def find_problematic_pairs(original_lab,
     return problematic_pairs
 
 def print_conflict_report(original_lab,
-                          threshold=15,
+                          optimized_lab=None,
+                          threshold=10,
                           cvd_types=None):
     """
-    Print every conflicting colour pair before optimisation.
+    Print every conflicting colour pair.
+
+    If optimized_lab is provided, also show the ΔE after optimisation
+    for the same pair and whether it was fixed.
     """
+
+    if cvd_types is None:
+        cvd_types = ["protan", "deutan", "tritan"]
 
     _, details = find_problematic_pairs(
         original_lab,
@@ -143,30 +150,62 @@ def print_conflict_report(original_lab,
         return_details=True
     )
 
-    print("\n" + "=" * 60)
+    print("\n" + "=" * 70)
     print("CONFLICT REPORT")
-    print("=" * 60)
+    print("=" * 70)
 
     if not details:
         print("No conflicting colour pairs found.")
-        print("=" * 60)
+        print("=" * 70)
         return
 
-    for item in sorted(details, key=lambda x: x["deltaE"]):
+    # Sort from worst conflict to least
+    details = sorted(details, key=lambda x: x["deltaE"])
+
+    for item in details:
 
         i, j = item["pair"]
+        cvd = item["cvd"]
 
-        print(
+        before = item["deltaE"]
+
+        line = (
             f"Colours ({i}, {j})"
-            f"  |  {item['cvd'].upper():7s}"
-            f"  |  ΔE = {item['deltaE']:.2f}"
+            f"  |  {cvd.upper():7s}"
+            f"  |  Before = {before:6.2f}"
         )
 
-    print("=" * 60)
+        if optimized_lab is not None:
+
+            simulated = simulate_palette_lab(
+                optimized_lab,
+                cvd_type=cvd,
+                severity=1.0
+            )
+
+            after = delta_e(
+                simulated[i],
+                simulated[j]
+            )
+
+            if after >= threshold:
+                status = "✓ FIXED"
+            else:
+                status = "✗ STILL CONFLICT"
+
+            line += (
+                f"  |  After = {after:6.2f}"
+                f"  |  Δ = {after-before:+5.2f}"
+                f"  |  {status}"
+            )
+
+        print(line)
+
+    print("=" * 70)
 
 
 def print_colour_summary(original_lab,
-                         threshold=15,
+                         threshold=10,
                          cvd_types=None,
                          mutable_indices=None):
     """

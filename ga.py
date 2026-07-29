@@ -12,7 +12,7 @@ from fitness import (
 
 
 POP_SIZE        = 100      
-N_GENERATIONS   = 200     
+N_GENERATIONS   = 100     
 ELITE_FRACTION  = 0.10    
 MUTATION_RATE   = 0.25    
 MUTATION_SIGMA  = 3.0                     

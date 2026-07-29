@@ -1,64 +1,3 @@
-# import matplotlib.pyplot as plt
-# import numpy as np
-
-# from palette_extraction import extract_palette_from_path
-# from ga import run_ga, report_result
-# from cvd_module import lab_to_srgb
-
-
-# # -----------------------------------
-# # SETTINGS
-# # -----------------------------------
-# IMAGE_PATH = "test_chart.png"      # your input image
-# K_COLORS   = 6                     # number of palette colors
-
-
-# # -----------------------------------
-# # STEP 1: Extract palette
-# # -----------------------------------
-# print("\nExtracting palette from image...\n")
-
-# original_lab, original_rgb, labels, counts = extract_palette_from_path(
-#     IMAGE_PATH,
-#     k=K_COLORS
-# )
-
-# print("Original RGB Palette:")
-# print(np.round(original_rgb, 3))
-
-
-# # -----------------------------------
-# # STEP 2: Run Genetic Algorithm
-# # -----------------------------------
-# best_lab, history = run_ga(original_lab)
-
-
-# # -----------------------------------
-# # STEP 3: Convert best palette to RGB
-# # -----------------------------------
-# best_rgb = lab_to_srgb(best_lab)
-
-# print("\nOptimized RGB Palette:")
-# print(np.round(best_rgb, 3))
-
-
-# # -----------------------------------
-# # STEP 4: Print comparison report
-# # -----------------------------------
-# report_result(original_lab, best_lab)
-
-
-# # -----------------------------------
-# # STEP 5: Plot fitness graph
-# # -----------------------------------
-# plt.figure(figsize=(8,5))
-# plt.plot(history, linewidth=2)
-# plt.title("Genetic Algorithm Progress")
-# plt.xlabel("Generation")
-# plt.ylabel("Best Fitness")
-# plt.grid(True)
-# plt.show()
-
 """
 main.py
 =======
@@ -113,34 +52,32 @@ from visualize import show_palette_comparison, show_convergence
 # Built-in test palette (used when no image is provided)
 # A deliberately bad palette: all red-green confusion colours
 # ─────────────────────────────────────────────────────────────
-# TEST_PALETTE_RGB = np.array([
-#     [0.55, 0.407, 0.121],   # red
-#     [0.9170, 0.96, 0.67],   # green
-#     [0.72940, 0.8117, 0.9333],   # orange
-#     [0.8588, 0.3921, 0.8392],   # lime green
-#     [0.2156, 0.91764, 0.803],   # dark red
-#     [0.15, 0.50, 0.15],   # dark green
-# ])
-
 TEST_PALETTE_RGB = np.array([
-    [0.0, 0.6392, 0.8784],   # red
-    [0.0, 0.6588, 0.5608],   # green
-    [0.5412, 0.2471, 0.9882],   # orange
-    [0.902, 0.0, 0.4039],   # lime green
-    [1.0, 0.8196, 0.0],   # dark red
-    [0.15, 0.50, 0.15],   # dark green
-])  
-
-
-
-TEST_PALETTE_RGB = np.array([
-    [0.95, 0.10, 0.10],   # bright red
-    [0.75, 0.20, 0.20],   # dark red
-    [0.10, 0.85, 0.10],   # bright green
-    [0.20, 0.60, 0.20],   # dark green
-    [0.10, 0.20, 0.95],   # blue
-    [0.95, 0.90, 0.15],   # yellow
+    [0.843, 0.188, 0.153],   # red
+    [0.9880, 0.553, 0.349],   # green
+    [0.996, 0.878, 0.545],   # orange
+    [0.851, 0.937, 0.545],   # lime green
+    [0.569, 0.812, 0.376],   # dark red
+    [0.102, 0.596, 0.314],   # dark green
 ])
+
+# TEST_PALETTE_RGB = np.array([
+#     [0.0, 0.6392, 0.8784],   # red
+#     [0.0, 0.6588, 0.5608],   # green
+#     [0.5412, 0.2471, 0.9882],   # orange
+#     [0.902, 0.0, 0.4039],   # lime green
+#     [1.0, 0.8196, 0.0],   # dark red
+#     [0.15, 0.50, 0.15],   # dark green
+# ])  
+
+
+# TEST_PALETTE_RGB = np.array([
+#     [0.3922, 0.5608, 1.0000],  # #648FFF
+#     [0.4706, 0.3686, 0.9412],  # #785EF0
+#     [0.8627, 0.1490, 0.4980],  # #DC267F
+#     [0.9961, 0.3804, 0.0000],  # #FE6100
+#     [1.0000, 0.6902, 0.0000],  # #FFB000
+# ])
  
 def main():
     # ── Parse arguments ──────────────────────────────────────
@@ -169,7 +106,7 @@ def main():
                         help=f"Maximum allowed colour drift ΔE (default: {DEFAULT_TAU})")
 
     # NEW: Threshold for detecting problematic colour pairs
-    parser.add_argument("--deltae", type=float, default=15,
+    parser.add_argument("--deltae", type=float, default=10,
                         help="ΔE threshold below which two colours are considered conflicting")
 
     parser.add_argument("--runs", type=int, default=1,
@@ -217,7 +154,6 @@ def main():
         threshold=args.deltae,
         cvd_types=args.cvd,
     )
-
 
     print_colour_summary(
         palette_lab,
@@ -353,6 +289,14 @@ def main():
         # Show detailed report for the best run
         print()
         report_result(palette_lab, optimized_lab, cvd_types=args.cvd)
+
+    print("\nAFTER OPTIMIZATION")
+
+    print_conflict_report(
+        optimized_lab,
+        threshold=args.deltae,
+        cvd_types=args.cvd,
+    )
  
     print("  Optimised palette (RGB hex) — best run:")
     for i, rgb in enumerate(optimized_rgb):

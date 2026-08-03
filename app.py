@@ -94,41 +94,48 @@ CSS = """
   }
   .warn { font-size: 0.68rem; padding-top: 3px; font-weight: 600; line-height: 1.3; }
 
-  /* ── Verdict banners ───────────────────────────────── */
-  .verdict { border: 2px solid #000; padding: 1rem 1.2rem; margin: 0.3rem 0; }
-  .verdict.bad { background: #000; }
-  .verdict.bad .vtitle, .verdict.bad .vbody { color: #FFF; }
-  .vtitle {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    font-size: 0.74rem; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 700;
-  }
-  .vbody { font-size: 0.97rem; margin-top: 0.35rem; line-height: 1.45; }
-
-  /* ── Conflict list ─────────────────────────────────── */
-  .conflict {
-    display: flex; align-items: center; gap: 14px;
-    padding: 11px 0; border-bottom: 1px solid #E0E0E0;
-  }
-  .chip { width: 32px; height: 32px; border: 1px solid #000; flex: none; }
-  .chip.pair { margin-left: -14px; }
-  .ctext { font-size: 0.92rem; }
-  .ctag {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase;
-    margin-left: auto; border: 1px solid #000; padding: 3px 9px; white-space: nowrap;
-  }
-  .ctag.hard { background: #000; color: #FFF; }
-
   /* ── Buttons ───────────────────────────────────────── */
+  /* The global colour rule above also hits the label inside the button,
+     so the inner elements need to be targeted explicitly or the text
+     stays black on a black background. */
   .stButton > button {
-    background: #000; color: #FFF; border: 2px solid #000; border-radius: 0;
+    background: #000; border: 2px solid #000; border-radius: 0;
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     font-size: 0.78rem; letter-spacing: 0.12em; text-transform: uppercase;
     padding: 0.6rem 1.5rem; font-weight: 600;
   }
-  .stButton > button:hover { background: #FFF; color: #000; border-color: #000; }
-  .stButton > button:focus { color: #FFF; border-color: #000; box-shadow: none; }
-  .stButton > button:focus:hover { color: #000; }
+  .stButton > button,
+  .stButton > button *,
+  .stButton > button p { color: #FFFFFF !important; }
+
+  .stButton > button:hover,
+  .stButton > button:hover *,
+  .stButton > button:hover p { color: #000000 !important; }
+  .stButton > button:hover { background: #FFFFFF; border-color: #000; }
+
+  .stButton > button:focus:not(:hover),
+  .stButton > button:focus:not(:hover) * { color: #FFFFFF !important; }
+  .stButton > button:focus { border-color: #000; box-shadow: none; outline: none; }
+  .stButton > button:active { background: #000; }
+  .stButton > button:active * { color: #FFFFFF !important; }
+
+  /* ── Copied colour codes ───────────────────────────── */
+  [data-testid="stCode"], .stCode, pre, code {
+    background: #FFFFFF !important;
+    border-radius: 0 !important;
+  }
+  [data-testid="stCode"] pre, .stCode pre, pre {
+    border: 1px solid #000 !important;
+    padding: 0.9rem 1.1rem !important;
+  }
+  [data-testid="stCode"] code, .stCode code, pre code, code, code span {
+    color: #000000 !important;
+    background: transparent !important;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace !important;
+    font-size: 0.95rem !important;
+    letter-spacing: 0.06em;
+  }
+  [data-testid="stCode"] button svg { stroke: #000000 !important; }
 
   .stProgress > div > div > div > div { background-color: #000; }
   [data-testid="stColorPicker"] label p {
@@ -150,7 +157,6 @@ VISION_ROWS = [
     ("Deuteranopia", "reduced green", "deutan"),
     ("Tritanopia", "reduced blue", "tritan"),
 ]
-CVD_NAME = {"protan": "protanopia", "deutan": "deuteranopia", "tritan": "tritanopia"}
 
 
 # ─────────────────────────────────────────────────────────────
@@ -175,20 +181,6 @@ def name(idx):
     return f"Colour {idx + 1}"
 
 
-def severity(delta):
-    """Plain-language stand-in for the raw distance."""
-    ratio = delta / CONFLICT_THRESHOLD
-    if ratio < 0.3:
-        return "Nearly identical", True
-    if ratio < 0.65:
-        return "Very similar", True
-    return "Easily confused", False
-
-
-# ─────────────────────────────────────────────────────────────
-# Cached analysis
-# ─────────────────────────────────────────────────────────────
-@st.cache_data(show_spinner=False)
 def palette_lab_from_hex(hex_list):
     return srgb_to_lab(np.array([hex_to_rgb01(h) for h in hex_list]))
 
@@ -265,59 +257,6 @@ def render_grid(palette_lab, details):
     )
 
 
-def render_verdict(details, optimised=False):
-    if not details:
-        body = (
-            "Every colour stays distinct for all three kinds of colour blindness."
-            if not optimised else
-            "Every colour now stays distinct for all three kinds of colour blindness."
-        )
-        st.markdown(
-            f'<div class="verdict"><div class="vtitle">◻ Good to go</div>'
-            f'<div class="vbody">{body}</div></div>',
-            unsafe_allow_html=True,
-        )
-        return False
-
-    pairs = {d["pair"] for d in details}
-    n = len(pairs)
-    st.markdown(
-        f'<div class="verdict bad">'
-        f'<div class="vtitle">◼ {n} {"pair" if n == 1 else "pairs"} hard to tell apart</div>'
-        f'<div class="vbody">Some viewers will see these colours as the same. '
-        f'They are listed below, closest first.</div></div>',
-        unsafe_allow_html=True,
-    )
-    return True
-
-
-def render_conflicts(palette_lab, details):
-    hexes = [lab_to_hex(l) for l in palette_lab]
-
-    # One row per pair, listing every kind of vision it affects
-    grouped = {}
-    for d in details:
-        entry = grouped.setdefault(d["pair"], {"worst": d["deltaE"], "cvds": []})
-        entry["worst"] = min(entry["worst"], d["deltaE"])
-        entry["cvds"].append(CVD_NAME[d["cvd"]])
-
-    rows = []
-    for pair, entry in sorted(grouped.items(), key=lambda kv: kv[1]["worst"]):
-        i, j = pair
-        word, hard = severity(entry["worst"])
-        cvds = entry["cvds"]
-        which = ", ".join(cvds[:-1]) + " and " + cvds[-1] if len(cvds) > 1 else cvds[0]
-        rows.append(
-            f'<div class="conflict">'
-            f'<div style="display:flex"><div class="chip" style="background:{hexes[i]}"></div>'
-            f'<div class="chip pair" style="background:{hexes[j]}"></div></div>'
-            f'<div class="ctext"><b>{name(i)}</b> and <b>{name(j)}</b> — with {which}</div>'
-            f'<div class="ctag{" hard" if hard else ""}">{word}</div>'
-            f'</div>'
-        )
-    st.markdown("".join(rows), unsafe_allow_html=True)
-
-
 def render_before_after(original_lab, optimized_lab, mutable_indices):
     cols = st.columns(len(original_lab))
     for i, col in enumerate(cols):
@@ -391,9 +330,8 @@ def optimise(palette_lab, mutable_indices, on_progress):
 # Screen
 # ═════════════════════════════════════════════════════════════
 st.markdown(
-    '<div class="masthead"><div class="title">Palette check</div>'
-    '<div class="sub">See how your colours look to people with colour blindness, '
-    'and fix the ones that clash.</div></div>',
+    '<div class="masthead"><div class="title">RANG</div>'
+    '<div class="sub">Reimagining the colour experience</div></div>',
     unsafe_allow_html=True,
 )
 
@@ -429,35 +367,19 @@ details = analyse(palette_lab)
 render_grid(palette_lab, details)
 
 
-# ── 3. Verdict ───────────────────────────────────────────────
-st.markdown('<div class="eyebrow">The verdict</div>', unsafe_allow_html=True)
+# ── 3. Optimise ──────────────────────────────────────────────
+st.markdown('<div class="eyebrow">Fix them</div>', unsafe_allow_html=True)
 
-has_conflicts = render_verdict(details)
+mutable_indices = mutable_for(palette_lab)
 
-if not has_conflicts:
+if not mutable_indices:
     st.markdown(
-        '<div class="cap" style="padding-top:14px;opacity:.6">'
-        'Nothing to fix. Change a colour above to check a different set.</div>',
+        '<div style="font-size:0.95rem">These colours already stay distinct for all '
+        'three kinds of colour blindness. Nothing to change.</div>',
         unsafe_allow_html=True,
     )
 else:
-    render_conflicts(palette_lab, details)
-
-    mutable_indices = mutable_for(palette_lab)
-    keep = [i for i in range(n_colours) if i not in mutable_indices]
-    moved = join_names(mutable_indices)
-    kept = join_names(keep) if keep else ""
-
-    st.markdown(
-        f'<div style="padding-top:16px;font-size:0.95rem">'
-        f'Fixing this means nudging <b>{moved}</b>.'
-        + (f' {kept} stay exactly as you picked them.' if len(keep) > 1
-           else f' {kept} stays exactly as you picked it.' if keep else '')
-        + '</div>',
-        unsafe_allow_html=True,
-    )
-
-    if st.button("Fix my colours"):
+    if st.button("Optimise palette"):
         bar = st.progress(0.0, text="Finding colours that stay distinct…")
         try:
             optimized_lab, _ = optimise(
@@ -480,15 +402,10 @@ else:
         optimized_lab = result["palette"]
         after = analyse(optimized_lab)
 
-        st.markdown('<div class="eyebrow">Your fixed palette</div>', unsafe_allow_html=True)
-        render_verdict(after, optimised=True)
-        if after:
-            render_conflicts(optimized_lab, after)
-
-        st.markdown('<div class="eyebrow">Before and after</div>', unsafe_allow_html=True)
+        st.markdown('<div class="eyebrow">Your optimised palette</div>', unsafe_allow_html=True)
         render_before_after(palette_lab, optimized_lab, result["mutable"])
 
-        st.markdown('<div class="eyebrow">How others see the fixed palette</div>',
+        st.markdown('<div class="eyebrow">How others see the optimised palette</div>',
                     unsafe_allow_html=True)
         render_grid(optimized_lab, after)
 

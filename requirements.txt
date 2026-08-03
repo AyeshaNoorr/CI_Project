@@ -1,0 +1,5 @@
+streamlit>=1.30
+numpy>=1.24
+colour-science>=0.4.3
+daltonlens>=0.1.5
+matplotlib>=3.7
